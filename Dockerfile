@@ -37,7 +37,6 @@ RUN mkdir -p /var/noc/{repo,backup,log}
 
 # add configuration files
 ADD ./assets/upgrade.defaults /opt/noc/etc/upgrade.defaults
-ADD ./assets/supervisord.conf /etc/supervisord.conf
 
 # configure web defaults
 RUN sed -i s/'127.0.0.1'/'0.0.0.0'/g /opt/noc/etc/noc-web.defaults
