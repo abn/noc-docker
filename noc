@@ -64,6 +64,8 @@ function detached(){
         --link noc-postgres:postgres \
         --link noc-mongo:mongo \
         --volumes-from noc-data \
+        -e "PG_PASSWORD=${PG_PASSWORD}" \
+        -e "MONGO_PASSWORD=${MONGO_PASSWORD}" \
         -p 8000:8000 -d ${NOC_CONTAINER} $@ > noc.docker.id
 }
 
@@ -72,6 +74,8 @@ function interactive(){
         --link noc-postgres:postgres \
         --link noc-mongo:mongo \
         --volumes-from noc-data \
+        -e "PG_PASSWORD=${PG_PASSWORD}" \
+        -e "MONGO_PASSWORD=${MONGO_PASSWORD}" \
         -p 8000:8000 --rm -it ${NOC_CONTAINER} $@
 }
 
