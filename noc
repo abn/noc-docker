@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+
+NOC_CONTAINER=alectolytic/noc
+
+PG_ADMIN_PASSWORD=${PG_ADMIN_PASSWORD:-noc}
+PG_PASSWORD=${POSTGRES_PASSWORD:-noc}
+MONGO_PASSWORD=${MONGO_PASSWORD:-noc}
+
+PG_CREATE_USER="CREATE USER noc SUPERUSER ENCRYPTED PASSWORD '${PG_PASSWORD}';"
+PG_CREATE_DB="CREATE DATABASE noc ENCODING 'UTF8' OWNER noc;"
+MONGO_CREATE_USER='db.createUser({"user": "noc", "pwd": "noc", "roles": ["readWrite"]})'
+
+function init-pgsql(){
+    docker run --name noc-postgres \
+        -e "POSTGRES_PASSWORD=${PG_ADMIN_PASSWORD}" -d postgres
+    sleep 4
+    for COMMAND in "${PG_CREATE_USER}" "${PG_CREATE_DB}"; do
+        docker run -it --link noc-postgres:postgres \
+            -e "PGPASSWORD=${PG_ADMIN_PASSWORD}" \
+            -e "COMMAND=${COMMAND}" \
+            --rm postgres bash -c 'psql -h "$POSTGRES_PORT_5432_TCP_ADDR" -p "$POSTGRES_PORT_5432_TCP_PORT" -U postgres -c "$COMMAND"'
+    done
+}
+
+function init-mongo(){
+    docker run --name noc-mongo -d mongo:2.6
+    docker run -it --link noc-mongo:mongo \
+        -e "COMMAND=${MONGO_CREATE_USER}" \
+        --rm mongo bash -c 'mongo "$MONGO_PORT_27017_TCP_ADDR:$MONGO_PORT_27017_TCP_PORT/noc" --eval "$COMMAND"'
+}
+
+function init-data(){
+    docker run -d --name noc-data --entrypoint /usr/bin/bash ${NOC_CONTAINER} true
+}
+
+function start(){
+    docker start noc-postgres > /dev/null 2>&1 \
+        || init-pgsql
+    docker start noc-mongo > /dev/null 2>&1 \
+        || init-mongo
+    docker start noc-data > /dev/null 2>&1 \
+        || init-data
+}
+
+function clean(){
+    stop
+    for i in postgres mongo data; do
+        docker rm noc-$i 2> /dev/null || true
+    done
+}
+
+function stop(){
+    { [ -f noc.docker.id ] \
+            && docker stop $(cat noc.docker.id) \
+            && rm noc.docker.id; } \
+        || true
+    for i in postgres mongo data; do
+        docker stop noc-$i 2> /dev/null || true
+    done
+}
+
+function detached(){
+    docker run \
+        --link noc-postgres:postgres \
+        --link noc-mongo:mongo \
+        --volumes-from noc-data \
+        -p 8000:8000 -d ${NOC_CONTAINER} $@ > noc.docker.id
+}
+
+function interactive(){
+    docker run \
+        --link noc-postgres:postgres \
+        --link noc-mongo:mongo \
+        --volumes-from noc-data \
+        -p 8000:8000 --rm -it ${NOC_CONTAINER} $@
+}
+
+
+function noc(){
+    if [ -z "${DETACH}" ]; then
+        interactive $@
+    else
+        detached $@
+    fi
+}
+
+case "$1" in
+    init-data|init-mongo|init-pgsql)
+        $1 ;;
+    stop)
+        stop ;;
+    start)
+        start ;;
+    restart)
+        stop; start ;;
+    clean)
+        clean ;;
+    build)
+        docker build -t ${NOC_CONTAINER} . ;;
+    *)
+        start && noc $1 ;;
+esac
