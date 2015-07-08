@@ -23,7 +23,7 @@ Once this is complete, you should be able to access NOC by visiting http://local
 The `noc` helper script sets up your environment such that an instance named `noc-data` is used to persist data between runs. To edit configuration, you can load this up in any container with your favorite editor and modify files located at `/opt/noc/etc`.
 
 ```sh
-docker run --rm -it --volumes-from noc-data bash
+docker run --rm -it --volumes-from noc-data fedora:22 bash
 ```
 
 This command will drop you into a shell with the data mounted.
